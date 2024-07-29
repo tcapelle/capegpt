@@ -3,12 +3,24 @@ import streamlit as st
 from typing import List, Dict
 
 
-model_options = ["gpt-4o-mini", "gpt-4o"]
+model_options = {
+    "gpt-4o-mini": "gpt-4o-mini",
+    "gpt-4o": "gpt-4o",
+    "llama405": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8"
+}
+
+LLAMA_URL = "http://195.242.16.33:8021/v1"
+llama_client = OpenAI(api_key="dummy_key", base_url=LLAMA_URL)
+
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
+def get_client_for_model(model: str) -> OpenAI:
+    return llama_client if model == model_options["llama405"] else client
+
 class Chat:
-    def __init__(self, name: str, client: OpenAI):
+    def __init__(self, name: str):
         self.name = name
         self.messages: List[Dict[str, str]] = []
-        self.client = client
 
     def add_message(self, role: str, content: str):
         self.messages.append({"role": role, "content": content})
@@ -27,8 +39,8 @@ class Chat:
         for message in self.messages:
             summary_prompt += f"{message['role']}: {message['content']}\n"
         
-        response = self.client.chat.completions.create(
-            model=st.session_state["openai_model"],
+        response = client.chat.completions.create(
+            model=model_options["gpt-4o-mini"],
             messages=[{"role": "user", "content": summary_prompt}],
             max_tokens=10,
             temperature=0.5,
@@ -44,9 +56,8 @@ class Chat:
 
 class ChatHistory:
     def __init__(self):
-        self.client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         if "chats" not in st.session_state:
-            st.session_state.chats = [Chat("New Chat", self.client)]
+            st.session_state.chats = [Chat("New Chat")]
         if "current_chat_index" not in st.session_state:
             st.session_state.current_chat_index = 0
 
@@ -70,7 +81,7 @@ class ChatHistory:
         current_chat.update_name_with_summary()
         
         # Add a new chat and set it as current
-        st.session_state.chats.append(Chat("New Chat", self.client))
+        st.session_state.chats.append(Chat("New Chat"))
         st.session_state.current_chat_index = len(st.session_state.chats) - 1
 
     def clear_current_chat(self):
@@ -78,7 +89,6 @@ class ChatHistory:
 
 def main():    
     chat_history = ChatHistory()
-    client = chat_history.client
 
     # Sidebar
     with st.sidebar:
@@ -100,21 +110,23 @@ def main():
             st.rerun()
         st.markdown("---")  # Horizontal line
         st.title("Model Settings")
-        if "openai_model" not in st.session_state:
-            st.session_state["openai_model"] = "gpt-4o"
+        if "model" not in st.session_state:
+            st.session_state["model"] = "gpt-4o"
         
-        st.session_state["openai_model"] = st.selectbox(
+        st.session_state["model"] = st.selectbox(
             "Choose a model",
             label_visibility="hidden",
-            options=model_options,
-            index=model_options.index(st.session_state["openai_model"]),
+            options=model_options.values(),
+            format_func=lambda x: next(k for k, v in model_options.items() if v == x),
+            index=list(model_options.values()).index(st.session_state["model"]),
             key="model_selectbox"
         )
         
         temperature = st.slider("Temperature:", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
 
         st.markdown("- **GPT4o** : Our high-intelligence flagship model for complex, multi-step tasks\n"
-                    "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks")
+                    "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks"
+                    "- **Llama405** : The Latest and baddest model from MetaAI (may not be available)")
     # Main content
     current_chat = chat_history.get_current_chat()
     for message in current_chat.messages:
@@ -127,8 +139,9 @@ def main():
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            stream = client.chat.completions.create(
-                model=st.session_state["openai_model"],
+            current_client = get_client_for_model(st.session_state["model"])
+            stream = current_client.chat.completions.create(
+                model=st.session_state["model"],
                 messages=[
                     {"role": m["role"], "content": m["content"]}
                     for m in current_chat.messages
@@ -138,7 +151,7 @@ def main():
             )
             response = st.write_stream(stream)
         current_chat.add_message("assistant", response)
-        st.caption(f"Model: {st.session_state['openai_model']}")
+        st.caption(f"Model: {st.session_state['model']}")
 
 if __name__ == "__main__":
     main()
