@@ -52,7 +52,7 @@ models = {
     "gpt-4o-mini": OpenAIModel("gpt-4o-mini", client),
     "gpt-4o": OpenAIModel("gpt-4o", client),
     "llama405": OpenAIModel("meta-llama/Meta-Llama-3.1-405B-Instruct-FP8", llama_client),
-    "claude-3-sonnet": AnthropicModel("claude-3-sonnet-20240229", anthropic_client)
+    "claude-3.5-sonnet": AnthropicModel("claude-3-5-sonnet-20240620", anthropic_client)
 }
 
 class Chat:
@@ -182,7 +182,7 @@ def main():
         st.markdown("- **GPT4o** : Our high-intelligence flagship model for complex, multi-step tasks\n"
                     "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks\n"
                     "- **Llama405** : The Latest and baddest model from MetaAI (may not be available)\n"
-                    "- **Claude Sonnet** : A powerful model from Anthropic")
+                    "- **Claude 3.5 Sonnet** : A powerful model from Anthropic")
     # Main content
     current_chat = chat_history.get_current_chat()
 
