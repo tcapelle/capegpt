@@ -1,22 +1,59 @@
 import json, base64
-from openai import OpenAI
+import openai
 import streamlit as st
 from typing import List, Dict
+from anthropic import Anthropic
 
+# Initialize clients
+client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+llama_client = openai.OpenAI(api_key="dummy_key", base_url="http://localhost:8000/v1")
+anthropic_client = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
-model_options = {
-    "gpt-4o-mini": "gpt-4o-mini",
-    "gpt-4o": "gpt-4o",
-    "llama405": "meta-llama/Meta-Llama-3.1-405B-Instruct-FP8"
+class Model:
+    def __init__(self, name: str, client):
+        self.name = name
+        self.client = client
+
+    def generate_stream(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int):
+        raise NotImplementedError
+
+class OpenAIModel(Model):
+    def generate_stream(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int):
+        return self.client.chat.completions.create(
+            model=self.name,
+            messages=messages,
+            stream=True,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+class AnthropicModel(Model):
+    def generate_stream(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int):
+        # Extract system message and convert other messages to Anthropic format
+        system_message = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
+        anthropic_messages = [
+            {
+                "role": "user" if msg["role"] == "user" else "assistant",
+                "content": [{"type": "text", "text": msg["content"]}]
+            }
+            for msg in messages if msg["role"] != "system"
+        ]
+
+        return self.client.messages.stream(
+            model=self.name,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system=system_message,
+            messages=anthropic_messages,
+        )
+
+# Define models
+models = {
+    "gpt-4o-mini": OpenAIModel("gpt-4o-mini", client),
+    "gpt-4o": OpenAIModel("gpt-4o", client),
+    "llama405": OpenAIModel("meta-llama/Meta-Llama-3.1-405B-Instruct-FP8", llama_client),
+    "claude-3-sonnet": AnthropicModel("claude-3-sonnet-20240229", anthropic_client)
 }
-
-LLAMA_URL = "http://195.242.16.33:8021/v1"
-llama_client = OpenAI(api_key="dummy_key", base_url=LLAMA_URL)
-
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-def get_client_for_model(model: str) -> OpenAI:
-    return llama_client if model == model_options["llama405"] else client
 
 class Chat:
     def __init__(self, name: str):
@@ -42,7 +79,7 @@ class Chat:
             summary_prompt += f"{message['role']}: {message['content']}\n"
         
         response = client.chat.completions.create(
-            model=model_options["gpt-4o-mini"],
+            model="gpt-4o-mini",
             messages=[{"role": "user", "content": summary_prompt}],
             max_tokens=10,
             temperature=0.5,
@@ -130,21 +167,22 @@ def main():
         if "model" not in st.session_state:
             st.session_state["model"] = "gpt-4o"
         
-        st.session_state["model"] = st.selectbox(
+        model_names = list(models.keys())
+        selected_model = st.selectbox(
             "Choose a model",
-            label_visibility="hidden",
-            options=model_options.values(),
-            format_func=lambda x: next(k for k, v in model_options.items() if v == x),
-            index=list(model_options.values()).index(st.session_state["model"]),
+            options=model_names,
+            index=model_names.index(st.session_state["model"]),
             key="model_selectbox"
         )
+        st.session_state["model"] = selected_model
         
         temperature = st.slider("Temperature:", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
 
         st.markdown("---")  # Horizontal line
         st.markdown("- **GPT4o** : Our high-intelligence flagship model for complex, multi-step tasks\n"
                     "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks\n"
-                    "- **Llama405** : The Latest and baddest model from MetaAI (may not be available)")
+                    "- **Llama405** : The Latest and baddest model from MetaAI (may not be available)\n"
+                    "- **Claude Sonnet** : A powerful model from Anthropic")
     # Main content
     current_chat = chat_history.get_current_chat()
 
@@ -162,17 +200,20 @@ def main():
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            current_client = get_client_for_model(st.session_state["model"])
-            stream = current_client.chat.completions.create(
-                model=st.session_state["model"],
-                messages=[
-                    {"role": "system", "content": current_chat.system_message},
-                    *[{"role": m["role"], "content": m["content"]} for m in current_chat.messages]
-                ],
-                stream=True,
-                temperature=temperature,
-            )
-            response = st.write_stream(stream)
+            current_model = models[st.session_state["model"]]
+            messages = [
+                {"role": "system", "content": current_chat.system_message},
+                *[{"role": m["role"], "content": m["content"]} for m in current_chat.messages]
+            ]
+            stream = current_model.generate_stream(messages, temperature, max_tokens=1024)
+
+            response = ""
+            if isinstance(current_model, AnthropicModel):
+                with stream as stream:
+                    response = st.write_stream(stream.text_stream)
+            else:
+                response = st.write_stream(stream)
+
         current_chat.add_message("assistant", response)
         st.caption(f"Model: {st.session_state['model']}")
     
