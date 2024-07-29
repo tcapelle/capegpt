@@ -3,6 +3,9 @@ import openai
 import streamlit as st
 from typing import List, Dict
 from anthropic import Anthropic
+import weave
+
+weave.init("capeGPT")
 
 # Initialize clients
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -14,21 +17,20 @@ class Model:
         self.name = name
         self.client = client
 
-    def generate_stream(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int):
+    def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         raise NotImplementedError
 
 class OpenAIModel(Model):
-    def generate_stream(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int):
+    def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         return self.client.chat.completions.create(
             model=self.name,
             messages=messages,
             stream=True,
             temperature=temperature,
-            max_tokens=max_tokens,
         )
 
 class AnthropicModel(Model):
-    def generate_stream(self, messages: List[Dict[str, str]], temperature: float, max_tokens: int):
+    def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         # Extract system message and convert other messages to Anthropic format
         system_message = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
         anthropic_messages = [
@@ -39,13 +41,17 @@ class AnthropicModel(Model):
             for msg in messages if msg["role"] != "system"
         ]
 
-        return self.client.messages.stream(
+        stream = self.client.messages.create(
+            max_tokens=4096,
             model=self.name,
-            max_tokens=max_tokens,
             temperature=temperature,
             system=system_message,
             messages=anthropic_messages,
+            stream=True,
         )
+        for event in stream:
+            if event.type == "content_block_delta" and hasattr(event.delta, "text"):
+                yield event.delta.text
 
 # Define models
 models = {
@@ -205,12 +211,11 @@ def main():
                 {"role": "system", "content": current_chat.system_message},
                 *[{"role": m["role"], "content": m["content"]} for m in current_chat.messages]
             ]
-            stream = current_model.generate_stream(messages, temperature, max_tokens=1024)
+            stream = current_model.generate_stream(messages, temperature)
 
             response = ""
             if isinstance(current_model, AnthropicModel):
-                with stream as stream:
-                    response = st.write_stream(stream.text_stream)
+                response = st.write_stream(stream)
             else:
                 response = st.write_stream(stream)
 
