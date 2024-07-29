@@ -1,3 +1,4 @@
+import json, base64
 from openai import OpenAI
 import streamlit as st
 from typing import List, Dict
@@ -52,11 +53,17 @@ class Chat:
         if self.name == "New Chat" and self.messages:
             summary = self.generate_summary()
             self.rename(summary)
-            return True
-        return False
 
     def set_system_message(self, message: str):
         self.system_message = message
+
+    def to_json(self) -> str:
+        chat_data = {
+            "name": self.name,
+            "system_message": self.system_message,
+            "messages": self.messages
+        }
+        return json.dumps(chat_data, indent=2)
 
 class ChatHistory:
     def __init__(self):
@@ -112,6 +119,7 @@ def main():
         if selected_chat_index != st.session_state.current_chat_index:
             chat_history.set_current_chat(selected_chat_index)
             st.rerun()
+        
         st.markdown("---")  # Horizontal line
         
         st.subheader("Model Settings")
@@ -139,6 +147,11 @@ def main():
                     "- **Llama405** : The Latest and baddest model from MetaAI (may not be available)")
     # Main content
     current_chat = chat_history.get_current_chat()
+
+    # Add chat header with download button
+    st.subheader(f"Current Chat: {current_chat.name}")
+
+    # Display chat history
     for message in current_chat.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -162,6 +175,18 @@ def main():
             response = st.write_stream(stream)
         current_chat.add_message("assistant", response)
         st.caption(f"Model: {st.session_state['model']}")
+    
+    # Function to handle download
+    def download_chat():
+        current_chat.update_name_with_summary()
+        return current_chat.to_json()
+    
+    st.download_button(
+        label="Download Current Chat",
+        data=download_chat(),
+        file_name=f"{current_chat.name.replace(' ', '_').lower()}_chat.json",
+        mime="application/json"
+    )
 
 if __name__ == "__main__":
     main()
