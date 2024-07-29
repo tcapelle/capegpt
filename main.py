@@ -1,9 +1,12 @@
-import json, base64
+from anthropic import Anthropic
+import base64
+from dataclasses import dataclass
+import json
 import openai
 import streamlit as st
-from typing import List, Dict
-from anthropic import Anthropic
+from typing import Dict, List, Union
 import weave
+from pydantic import Field
 
 weave.init("capeGPT")
 
@@ -12,15 +15,17 @@ client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 llama_client = openai.OpenAI(api_key="dummy_key", base_url="http://localhost:8000/v1")
 anthropic_client = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
-class Model:
-    def __init__(self, name: str, client):
-        self.name = name
-        self.client = client
 
+class Model(weave.Model):
+    name: str
+    client: Union[openai.OpenAI, Anthropic]
+
+    @weave.op
     def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         raise NotImplementedError
 
 class OpenAIModel(Model):
+    @weave.op
     def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         return self.client.chat.completions.create(
             model=self.name,
@@ -30,6 +35,7 @@ class OpenAIModel(Model):
         )
 
 class AnthropicModel(Model):
+    @weave.op
     def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         # Extract system message and convert other messages to Anthropic format
         system_message = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
@@ -55,17 +61,20 @@ class AnthropicModel(Model):
 
 # Define models
 models = {
-    "gpt-4o-mini": OpenAIModel("gpt-4o-mini", client),
-    "gpt-4o": OpenAIModel("gpt-4o", client),
-    "llama405": OpenAIModel("meta-llama/Meta-Llama-3.1-405B-Instruct-FP8", llama_client),
-    "claude-3.5-sonnet": AnthropicModel("claude-3-5-sonnet-20240620", anthropic_client)
+    "gpt-4o-mini": OpenAIModel(name="gpt-4o-mini", client=client),
+    "gpt-4o": OpenAIModel(name="gpt-4o", client=client),
+    "llama405": OpenAIModel(name="meta-llama/Meta-Llama-3.1-405B-Instruct-FP8", client=llama_client),
+    "claude-3.5-sonnet": AnthropicModel(name="claude-3-5-sonnet-20240620", client=anthropic_client)
 }
 
+@dataclass
 class Chat:
-    def __init__(self, name: str):
-        self.name = name
-        self.messages: List[Dict[str, str]] = []
-        self.system_message: str = "You are a helpful assistant, be brief."
+    name: str
+    system_message: str = "You are a helpful assistant, be brief."
+    messages: list[dict[str, str]] = Field(default_factory=list)
+
+    def __post_init__(self):
+        self.clear_messages()
 
     def add_message(self, role: str, content: str):
         self.messages.append({"role": role, "content": content})
@@ -107,6 +116,8 @@ class Chat:
             "messages": self.messages
         }
         return json.dumps(chat_data, indent=2)
+
+
 
 class ChatHistory:
     def __init__(self):
