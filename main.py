@@ -2,6 +2,8 @@ from openai import OpenAI
 import streamlit as st
 from typing import List, Dict
 
+
+model_options = ["gpt-4o-mini", "gpt-4o"]
 class Chat:
     def __init__(self, name: str, client: OpenAI):
         self.name = name
@@ -96,21 +98,23 @@ def main():
         if selected_chat_index != st.session_state.current_chat_index:
             chat_history.set_current_chat(selected_chat_index)
             st.rerun()
-        
+        st.markdown("---")  # Horizontal line
         st.title("Model Settings")
-        model_options = ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"]
         if "openai_model" not in st.session_state:
             st.session_state["openai_model"] = "gpt-4o"
         
         st.session_state["openai_model"] = st.selectbox(
-            "Choose a model:",
+            "Choose a model",
+            label_visibility="hidden",
             options=model_options,
             index=model_options.index(st.session_state["openai_model"]),
             key="model_selectbox"
         )
         
-        temperature = st.slider("Temperature", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
+        temperature = st.slider("Temperature:", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
 
+        st.markdown("- **GPT4o** : Our high-intelligence flagship model for complex, multi-step tasks\n"
+                    "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks")
     # Main content
     current_chat = chat_history.get_current_chat()
     for message in current_chat.messages:
