@@ -21,6 +21,7 @@ class Chat:
     def __init__(self, name: str):
         self.name = name
         self.messages: List[Dict[str, str]] = []
+        self.system_message: str = "You are a helpful assistant, be brief."
 
     def add_message(self, role: str, content: str):
         self.messages.append({"role": role, "content": content})
@@ -53,6 +54,9 @@ class Chat:
             self.rename(summary)
             return True
         return False
+
+    def set_system_message(self, message: str):
+        self.system_message = message
 
 class ChatHistory:
     def __init__(self):
@@ -109,7 +113,12 @@ def main():
             chat_history.set_current_chat(selected_chat_index)
             st.rerun()
         st.markdown("---")  # Horizontal line
-        st.title("Model Settings")
+        
+        st.subheader("Model Settings")
+        current_chat = chat_history.get_current_chat()
+        system_message = st.text_area("Set system message:", value=current_chat.system_message)
+        if system_message != current_chat.system_message:
+            current_chat.set_system_message(system_message)
         if "model" not in st.session_state:
             st.session_state["model"] = "gpt-4o"
         
@@ -124,8 +133,9 @@ def main():
         
         temperature = st.slider("Temperature:", min_value=0.0, max_value=2.0, value=1.0, step=0.1)
 
+        st.markdown("---")  # Horizontal line
         st.markdown("- **GPT4o** : Our high-intelligence flagship model for complex, multi-step tasks\n"
-                    "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks"
+                    "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks\n"
                     "- **Llama405** : The Latest and baddest model from MetaAI (may not be available)")
     # Main content
     current_chat = chat_history.get_current_chat()
@@ -143,8 +153,8 @@ def main():
             stream = current_client.chat.completions.create(
                 model=st.session_state["model"],
                 messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in current_chat.messages
+                    {"role": "system", "content": current_chat.system_message},
+                    *[{"role": m["role"], "content": m["content"]} for m in current_chat.messages]
                 ],
                 stream=True,
                 temperature=temperature,
