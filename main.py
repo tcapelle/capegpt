@@ -12,7 +12,7 @@ weave.init("capeGPT")
 
 # Initialize clients
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-llama_client = openai.OpenAI(api_key="dummy_key", base_url="http://localhost:8000/v1")
+llama_client = openai.OpenAI(api_key="dummy_key", base_url=st.secrets["LLAMA_URL"])
 anthropic_client = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
 
