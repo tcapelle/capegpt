@@ -12,7 +12,6 @@ weave.init("capeGPT")
 
 # Initialize clients
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-llama_client = openai.OpenAI(api_key="dummy_key", base_url=st.secrets["LLAMA_URL"])
 anthropic_client = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
 
@@ -63,7 +62,8 @@ class AnthropicModel(Model):
 models = {
     "gpt-4o-mini": OpenAIModel(name="gpt-4o-mini", client=client),
     "gpt-4o": OpenAIModel(name="gpt-4o", client=client),
-    # "llama405": OpenAIModel(name="meta-llama/Meta-Llama-3.1-405B-Instruct-FP8", client=llama_client),
+    "gpt-4": OpenAIModel(name="gpt-4", client=client),
+    "gpt-4-turbo": OpenAIModel(name="gpt-4-turbo", client=client),
     "claude-3.5-sonnet": AnthropicModel(name="claude-3-5-sonnet-20240620", client=anthropic_client)
 }
 
@@ -198,7 +198,8 @@ def main():
         st.markdown("---")  # Horizontal line
         st.markdown("- **GPT4o** : Our high-intelligence flagship model for complex, multi-step tasks\n"
                     "- **GPT4o-mini** : Our affordable and intelligent small model for fast, lightweight tasks\n"
-                    # "- **Llama405** : The Latest and baddest model from MetaAI (may not be available)\n"
+                    "- **GPT4** : The OG GPT-4 model, still powerful and capable\n"
+                    "- **GPT4-turbo** : Another flavor of GPT-4, designed for complex tasks but faster than GPT-4\n"
                     "- **Claude 3.5 Sonnet** : A powerful model from Anthropic")
     # Main content
     current_chat = chat_history.get_current_chat()
