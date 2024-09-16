@@ -7,12 +7,13 @@ import streamlit as st
 from typing import Dict, List, Union
 import weave
 from pydantic import Field
+import anthropic
 
 weave.init("capeGPT")
 
 # Initialize clients
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-anthropic_client = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+anthropic_client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
 
 class Model(weave.Model):
@@ -39,24 +40,19 @@ class AnthropicModel(Model):
         # Extract system message and convert other messages to Anthropic format
         system_message = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
         anthropic_messages = [
-            {
-                "role": "user" if msg["role"] == "user" else "assistant",
-                "content": [{"type": "text", "text": msg["content"]}]
-            }
+            {"role": "user" if msg["role"] == "user" else "assistant", "content": msg["content"]}
             for msg in messages if msg["role"] != "system"
         ]
 
-        stream = self.client.messages.create(
+        with self.client.messages.stream(
             max_tokens=4096,
             model=self.name,
             temperature=temperature,
             system=system_message,
             messages=anthropic_messages,
-            stream=True,
-        )
-        for event in stream:
-            if event.type == "content_block_delta" and hasattr(event.delta, "text"):
-                yield event.delta.text
+        ) as stream:
+            for text in stream.text_stream:
+                yield text
 
 # Define models
 models = {
@@ -64,6 +60,8 @@ models = {
     "gpt-4o": OpenAIModel(name="gpt-4o", client=client),
     "gpt-4": OpenAIModel(name="gpt-4", client=client),
     "gpt-4-turbo": OpenAIModel(name="gpt-4-turbo", client=client),
+    "o1-previw": OpenAIModel(name="o1-preview", client=client),
+    "o1-mini": OpenAIModel(name="o1-mini", client=client),
     "claude-3.5-sonnet": AnthropicModel(name="claude-3-5-sonnet-20240620", client=anthropic_client)
 }
 
