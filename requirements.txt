@@ -1,3 +1,4 @@
 openai>=1.0.0
 weave
 anthropic>=0.29
+extra_streamlit_components
