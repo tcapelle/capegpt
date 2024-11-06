@@ -9,14 +9,19 @@ import anthropic
 from extra_streamlit_components import CookieManager
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
+from datetime import datetime, timedelta
 
 def manage_cookies():
     cookie_manager = CookieManager(key='cookie_manager_1')
     
     # Load cookies
-    stored_data = cookie_manager.get(cookie="chat_history")
-    if stored_data:
-        stored_data = json.loads(stored_data)
+    stored_data = None
+    # Request all cookies and wait for the browser to send them
+    cookies = cookie_manager.get_all(key='get_all_cookies')
+    if cookies:
+        stored_data = cookies.get("chat_history")
+        if stored_data:
+            stored_data = json.loads(stored_data)
     
     # Save cookies if needed
     if 'save_chat_history' in st.session_state and st.session_state.save_chat_history:
@@ -24,7 +29,13 @@ def manage_cookies():
             "chats": [chat.model_dump() for chat in st.session_state.chats],
             "current_chat_index": st.session_state.current_chat_index
         }
-        cookie_manager.set("chat_history", json.dumps(chat_data))
+        # Set an expiration date for the cookie
+        expiration_date = (datetime.now() + timedelta(days=30)).strftime("%a, %d %b %Y %H:%M:%S GMT")
+        cookie_manager.set(
+            "chat_history",
+            json.dumps(chat_data),
+            expires=expiration_date
+        )
         st.session_state.save_chat_history = False
         st.sidebar.success("Chat history saved to cookie!")
 
