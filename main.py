@@ -12,13 +12,14 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 
 def manage_cookies():
-    cookie_manager = CookieManager(key='cookie_manager_1')
+    cookie_manager = CookieManager()
     
     # Load cookies
     stored_data = None
     # Request all cookies and wait for the browser to send them
-    cookies = cookie_manager.get_all(key='get_all_cookies')
+    cookies = cookie_manager.get_all()
     if cookies:
+        print(cookies)
         stored_data = cookies.get("chat_history")
         if stored_data:
             stored_data = json.loads(stored_data)
@@ -59,6 +60,21 @@ class Model(weave.Model):
 class OpenAIModel(Model):
     @weave.op
     def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
+        if "o1" in self.name:
+            # For o1 models, combine system message with first user message
+            system_message = next((msg["content"] for msg in messages if msg["role"] == "system"), "")
+            processed_messages = []
+            
+            for msg in messages:
+                if msg["role"] == "system":
+                    continue
+                if msg["role"] == "user" and not processed_messages:
+                    # Prepend system message to first user message
+                    msg = {"role": "user", "content": f"{system_message}\n\n{msg['content']}"}
+                processed_messages.append(msg)
+            
+            messages = processed_messages
+        
         return self.client.chat.completions.create(
             model=self.name,
             messages=messages,
@@ -135,6 +151,7 @@ class Chat(BaseModel):
 class ChatHistory:
     def __init__(self):
         if 'chats' not in st.session_state:
+            print("Loading chats from cookies")
             stored_data = manage_cookies()
             if stored_data:
                 st.session_state.chats = [Chat.model_validate(chat_data) for chat_data in stored_data.get("chats", [])]
