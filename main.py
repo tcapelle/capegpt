@@ -191,6 +191,20 @@ class ChatHistory:
         self.save_chats()
 
 def main():
+    st.markdown("""
+        <style>
+        .stChatInput {
+            height: 50px !important;
+            width: 100% !important;
+            margin: 0 auto !important;
+        }
+        textarea.st-cf {
+            height: 80px !important;
+            width: 80% !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     chat_history = ChatHistory()
 
     with st.sidebar:
@@ -262,15 +276,20 @@ def main():
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            current_model = models[current_chat.model_name]
-            messages = [
-                {"role": "system", "content": current_chat.system_message},
-                *current_chat.messages
-            ]
-            stream = current_model.generate_stream(messages, temperature)
-            response = st.write_stream(stream)
+            try:
+                current_model = models[current_chat.model_name]
+                messages = [
+                    {"role": "system", "content": current_chat.system_message},
+                    *current_chat.messages[:-1]  # Exclude the last message since we'll add it below
+                ]
+                stream = current_model.generate_stream(messages, temperature)
+                response = st.write_stream(stream)
+                current_chat.add_message("assistant", response)
+            except Exception as e:
+                error_message = "Sorry, there was an error communicating with the model. Please try again in a moment."
+                st.error(error_message)
+                current_chat.add_message("assistant", error_message)
 
-        current_chat.add_message("assistant", response)
         chat_history.save_chats()
         st.rerun()
 
