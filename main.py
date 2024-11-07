@@ -111,10 +111,11 @@ class AnthropicModel(Model):
 # Define models
 models = {
     "claude-3.5-sonnet": AnthropicModel(name="claude-3-5-sonnet-latest", client=anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])),
+    "claude-3.5-haiku": AnthropicModel(name="claude-3-5-haiku-latest", client=anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])),
     "gpt-4o-mini": OpenAIModel(name="gpt-4o-mini", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
     "gpt-4o": OpenAIModel(name="gpt-4o", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
-    "gpt-4": OpenAIModel(name="gpt-4", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
-    "gpt-4-turbo": OpenAIModel(name="gpt-4-turbo", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
+    # "gpt-4": OpenAIModel(name="gpt-4", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
+    # "gpt-4-turbo": OpenAIModel(name="gpt-4-turbo", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
     "o1-preview": OpenAIModel(name="o1-preview", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
     "o1-mini": OpenAIModel(name="o1-mini", client=openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])),
 }
