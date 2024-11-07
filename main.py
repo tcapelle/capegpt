@@ -73,14 +73,22 @@ class OpenAIModel(Model):
                     msg = {"role": "user", "content": f"{system_message}\n\n{msg['content']}"}
                 processed_messages.append(msg)
             
-            messages = processed_messages
-        
-        return self.client.chat.completions.create(
-            model=self.name,
-            messages=messages,
-            stream=True,
-            temperature=temperature,
-        )
+            # Non-streaming response for o1 models
+            response = self.client.chat.completions.create(
+                model=self.name,
+                messages=processed_messages,
+                stream=False,
+                temperature=temperature,
+            )
+            yield response.choices[0].message.content
+        else:
+            # Streaming response for other models
+            yield from self.client.chat.completions.create(
+                model=self.name,
+                messages=messages,
+                stream=True,
+                temperature=temperature,
+            )
 
 class AnthropicModel(Model):
     @weave.op
