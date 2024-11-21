@@ -4,21 +4,18 @@ import json
 import openai
 import streamlit as st
 from typing import Dict, List, Union
-import weave
 import anthropic
 from pydantic import BaseModel, Field
 
 # Model classes
-class Model(weave.Model):
+class Model(BaseModel):
     model_name: str
     client: Union[openai.OpenAI, anthropic.Anthropic]
 
-    @weave.op
     def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         raise NotImplementedError
 
 class OpenAIModel(Model):
-    @weave.op
     def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         if "o1" in self.model_name:
             # For o1 models, combine system message with first user message
@@ -55,7 +52,6 @@ class OpenAIModel(Model):
                         yield chunk.choices[0].delta.content
 
 class AnthropicModel(Model):
-    @weave.op
     def generate_stream(self, messages: List[Dict[str, str]], temperature: float):
         system_message = next((msg["content"] for msg in messages if msg["role"] == "system"), None)
         anthropic_messages = [
